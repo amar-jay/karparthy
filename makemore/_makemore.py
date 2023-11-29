@@ -1,10 +1,11 @@
 import torch
+from torch.functional import Tensor
 from torch.nn import functional as F
 import torch.nn as nn
 from torch.utils.data import Dataset
 
 class CharDataset(Dataset):
-	def __init__(self, words, chars, max_word_length):
+	def __init__(self, words:str, chars, max_word_length):
 		self.words = words
 		self.chars = chars
 		self.max_word_length = max_word_length
@@ -23,11 +24,11 @@ class CharDataset(Dataset):
 	def get_output_length(self):
 		return self.max_word_length + 1 # <START> token followed by words
 
-	def encode(self, word: str) -> int[]:
+	def encode(self, word: str) -> Tensor:
 		ix = torch.tensor([self.stoi[w] for w in word], dtype=torch.long)
 		return ix
 
-	def decode(self, ix: int) -> str:
+	def decode(self, ix: Tensor) -> str:
 		return ''.join(self.itos[i] for i in ix)
 	
 	def __getitem__(self, idx):
