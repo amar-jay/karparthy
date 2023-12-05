@@ -1,9 +1,11 @@
 from typing import List
 import os
+import time
 import torch
 import random
 from dataclasses import dataclass
 from torch.functional import Tensor
+from torch.utils.data.dataloader import DataLoader
 from torch.nn import functional as F
 import torch.nn as nn
 from torch.utils.data import Dataset
@@ -45,10 +47,58 @@ class CharDataset(Dataset):
 	def decode(self, ix: List[int]) -> str:
 		return ''.join(self.itoa[i] for i in ix)
 	
-	def __getitem__(self):
-		#TODO
-		return
+	def __getitem__(self, idx):
+		word = self.words[idx]
+		ix = self.encode(word)
+		x = torch.zeros(self.max_word_length + 1, dtype=torch.long)
+		y = torch.zeros(self.max_word_length + 1, dtype=torch.long)
+		x[1:1+len(ix)] = ix
+		y[:len(ix)] = ix
+		y[len(ix)+1:] = -1 # index -1 will mask the loss at the inactive locations
 
+		return x, y
+
+def create_dataset(input_file) -> tuple[CharDataset, CharDataset]:
+	with open(input_file, 'r') as f:
+		words = f.read().splitlines()
+	names = [w.strip() for w in words]
+
+	max_len = max(len(v) for v in names)
+	min_len = min(len(v) for v in names)
+	chars = sorted(list(set("".join(names))))
+	chars_count = len(chars)
+	test_set_size = min(1000, int(len(names) * 0.1))
+
+	names = sorted(names, key=lambda _: random.random())
+	train_dset = CharDataset(names[:-test_set_size], chars, max_len)
+	test_dset = CharDataset(names[-test_set_size:], chars, max_len)
+
+	print("\n", "*"*30, "DATASET INFO", "*"*30)
+	print("names: ", names[:5])
+	print("number of names: ", len(names))
+	print("vocab_size: ", chars_count)
+	print("context length: ", max_len)
+	print("(list of chars, vocab_size): ", ("".join(chars), chars_count))
+	print("(max word length, min word length): ", (max_len, min_len))
+	print("(train size, test size): ", (len(names) - test_set_size, test_set_size))
+	print("*" * 75, "\n")
+
+	return train_dset, test_dset
+
+# a dataloader that can be iterated infinitely
+class InfiniteDataLoader:
+    def __init__(self, dataset, **kwargs):
+        train_sampler = torch.utils.data.RandomSampler(dataset, replacement=True, num_samples=int(1e10))
+        self.train_loader = DataLoader(dataset, sampler=train_sampler, **kwargs)
+        self.data_iter = iter(self.train_loader)
+
+    def next(self):
+        try:
+            batch = next(self.data_iter)
+        except StopIteration: # this will technically only happen after 1e10 samples... (i.e. basically never)
+            self.data_iter = iter(self.train_loader)
+            batch = next(self.data_iter)
+        return batch
 
 # -----------------------------------------------------------------------------
 # Bigram Language Model
@@ -78,28 +128,6 @@ class Bigram(nn.Module):
 		return logits, loss 
 
 # -----------------------------------------------------------------------------
-def create_dataset(input_file):
-	with open(input_file, 'r') as f:
-		words = f.read().splitlines()
-	names = [w.strip() for w in words]
-
-	min_chars = 1,
-	max_chars = max(len(v) for v in names)
-	chars = sorted(list(set("".join(names))))
-	chars_count = len(chars)
-	print("names: ", names[:5])
-	print("number of names: ", len(names))
-	print("(list of chars, count): ", ("".join(chars), chars_count))
-	print("(max word length, min word length): ", (max_chars, min_chars))
-
-	# TODO: partition
-	test_set_size = min(1000, int(len(names) * 0.1))
-
-	names = sorted(names, key=lambda _: random.random())
-	train_dset = CharDataset(names[:-test_set_size], chars, max_chars)
-	test_dset = CharDataset(names[-test_set_size:], chars, max_chars)
-
-	return train_dset, test_dset
 
 @torch.no_grad()
 def generate(model:nn.Module, idx, max_new_tokens, tempreture=-1.0):
@@ -148,6 +176,7 @@ if __name__ == "__main__":
 	input_file = "./names.txt"
 	batch_size = 32
 	num_workers = 2
+	block_size = 3
 	learning_rate = 0.1
 	weight_decay = 0.01
 
@@ -155,31 +184,60 @@ if __name__ == "__main__":
 
 	train_dset, test_dset = create_dataset(input_file)
 	vocab_size = train_dset.get_vocab_size()
-	block_size = train_dset.get_output_length() # context length
+	block_size = min(block_size, train_dset.get_output_length()) # context length
 
-	print(f"dataset determined that:\n{vocab_size=}")
 	conf = ModelConfig(
 			vocab_size=vocab_size,
 			block_size = block_size,
 			)
-	model = Bigram(conf)
-	block_size = model.block_size
 
-	print(f"{block_size=}")
+	model = Bigram(conf)
 
 	print("params: ", model.parameters())
-
 	
 	state_path = os.path.join("assets", "model.pt")
 #	model.load_state_dict(torch.load(state_path))
 
 	print("Model training...")
-	    # init optimizer
+	# init optimizer
 	optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay, betas=(0.9, 0.99), eps=1e-8)
+	# init dataloader
+	batch_loader = InfiniteDataLoader(train_dset, batch_size=batch_size, pin_memory=True, num_workers=num_workers)
+	# print_samples()
 
-	    # init dataloader
-	batch_loader = InfiniteDataLoader(train_dataset, batch_size=batch_size, pin_memory=True, num_workers=num_workers)
+	lre = torch.arange(-3, 0, 1000)
+	lri = 10 ** lre 
 
-	print_samples()
+	for i in range(5):
+		start_time = time.time()
+
+		# minibatches
+		batch = batch_loader.next()
+		X, Y = batch
+		print(len(X), Y.shape)
+
+		itoa = train_dset.itoa
+		x_str = ["".join(itoa[i.item()] for i in x) for x in X[:1]]
+		y_str = ["".join(itoa[i.item()] for i in y) for y in X[:1]]
+		
+		# y_str = ["".join(itoa[i.item()] for i in Y[0] if i != 0)]
+		print(f"{x_str=} => {y_str}")
+		
+
+
+		# forwardpass
+		logits, loss = model(X, Y)
+
+
+		# # backward pass
+		# model.zero_grad(set_to_none=True)
+		# loss.backward()
+
+		# # update
+		# optimizer.step()
+
+		duration = time.time() - start_time
+
+		# track stats
 
 
