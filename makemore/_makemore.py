@@ -1,11 +1,24 @@
+from typing import List
 import torch
+import random
+from dataclasses import dataclass
 from torch.functional import Tensor
 from torch.nn import functional as F
 import torch.nn as nn
 from torch.utils.data import Dataset
 
+@dataclass
+class ModelConfig:
+    block_size: int = 0 # length of the input sequences of integers
+    vocab_size: int =  0 # the input integers are in range [0 .. vocab_size -1]
+
+    n_layer: int = 0
+    n_embd: int = 0
+    n_embd2: int = 0
+    n_head: int = 0
+
 class CharDataset(Dataset):
-	def __init__(self, words:str, chars, max_word_length):
+	def __init__(self, words:List[str], chars, max_word_length):
 		self.words = words
 		self.chars = chars
 		self.max_word_length = max_word_length
@@ -23,35 +36,122 @@ class CharDataset(Dataset):
 
 	def get_output_length(self):
 		return self.max_word_length + 1 # <START> token followed by words
-
 	def encode(self, word: str) -> Tensor:
 		ix = torch.tensor([self.stoi[w] for w in word], dtype=torch.long)
 		return ix
 
-	def decode(self, ix: Tensor) -> str:
+	def decode(self, ix: List[int]) -> str:
 		return ''.join(self.itos[i] for i in ix)
 	
-	def __getitem__(self, idx):
+	def __getitem__(self):
 		#TODO
 		return
 
 
+# -----------------------------------------------------------------------------
+# Bigram Language Model
+
 class Bigram(nn.Module):
 	
-	def __init__(self, config):
+	def __init__(self, config:ModelConfig):
 		super().__init__()
 		n = config.vocab_size
 		self.logits = nn.Parameter(torch.zeros((n, n)))
 
+	def get_block_size(self):
+		return 1 # since this is a 2-gram, onlt prev character is neccessary 
+
 	# TODO: I understand nothing here!!!
 	def forward(self, idx, targets=None):
 
-         # 'forward pass', lol
-		logits = self.logits[idx]
+		 # forward pass
+		logits = self.logits[idx] # x @ C
+		print("logits.shape: ", logits.shape)
 
-        # if we are given some desired targets also calculate the loss
 		loss = None
 		if targets is not None:
 			loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
+			print("loss shape: ", loss.shape)
 
-		return logits, loss
+		return logits 
+
+# -----------------------------------------------------------------------------
+def create_dataset(input_file):
+	with open(input_file, 'r') as f:
+		words = f.read().splitlines()
+	names = [w.strip() for w in words]
+
+	min_chars = 1,
+	max_chars = max(len(v) for v in names)
+	chars = sorted(list(set("".join(names))))
+	chars_count = len(chars)
+	print("names: ", names[:5])
+	print("number of names: ", len(names))
+	print("(list of chars, count): ", ("".join(chars), chars_count))
+	print("(max word length, min word length): ", (max_chars, min_chars))
+
+	# TODO: partition
+	test_set_size = min(1000, int(len(names) * 0.1))
+	n = len(names)-test_set_size
+	names = sorted(names, key=lambda _: random.random())
+	train_dset = CharDataset(names[:n], chars, max_chars)
+
+	names = sorted(names, key=lambda _: random.random())
+	test_dset = CharDataset(names[n:], chars, max_chars)
+
+	return train_dset, test_dset
+@torch.no_grad()
+def generate(model:nn.Module, idx, max_new_tokens, tempreture=-1.0, top_k=None):
+	block_size = model.get_block_size()
+	for _ in range(max_new_tokens):
+		idx_cond = idx if idx.size(1) <= block_size else idx[:, -block_size:]
+		logits, _ = model(idx_cond)
+		# pluck the logits at the final step and scale by desired temperature
+		logits = logits[:, -1, :] / tempreture
+
+
+		probs = F.softmax(logits, dim=-1)
+		idx_next = torch.multinomial(probs, num_samples=1)
+		idx = torch.cat((idx, idx_next), dim=1)
+	
+	samples = idx
+	train_samp, test_samp, new_samp = [], [], []
+	for i in range(samples.size(0)):
+		row = samples[i,:].tolist()
+		word = train_dset.decode(row)
+		
+		if train_dset.contains(word):
+			train_samp.append(word)
+		elif test_dataset.contains(word):
+			test_samp.append(word)
+		else:
+			new_samp.append(word)
+	return { "train_samp": train_samp, "test_samp": test_samp, "new_samp":new_samp}
+
+def print_samples(num=10):
+	idx = torch.zeros(num, 1, dtype=torch.long).to("cuda")
+	steps = train_dset.get_output_length() - 1 # -1 because we already start with <START> token (index 0)
+	samples = generate(model, idx, steps, top_k=None)
+
+	print("*"*10)
+	for desc, lst in samples.items():
+		print("*"*3, desc, "*"*3)
+		for word in lst:
+			print(word)
+	print("*"*10)
+	
+
+
+if __name__ == "__main__":
+	top_k = None
+	input_file = "./names.txt"
+	train_dset = create_dataset(input_file)
+	vocab_size = train_dset.get_vocab_size()
+	block_size = train_dset.get_output_size()
+	train_dset = CharDataset("", None, 15)
+	test_dataset = CharDataset("", None, 15)
+	conf = ModelConfig()
+	model = Bigram(conf)
+	print_samples()
+
+
