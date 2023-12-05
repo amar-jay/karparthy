@@ -41,7 +41,7 @@ class Bigram(nn.Module):
 	def __init__(self, config):
 		super().__init__()
 		n = config.vocab_size
-		self.logits = nn.Parameter(torch.zeros((n, n)))
+		self.logits = nn.Parameter(torch.randn((n, n)))
 
 	# TODO: I understand nothing here!!!
 	def forward(self, idx, targets=None):
