@@ -234,7 +234,7 @@ if __name__ == "__main__":
 
 #	print("params: ", model.parameters())
 	
-	state_path = os.path.join("assets", "model.pt")
+	state_path = os.path.join("assets", "model", "model.pt")
 #	model.load_state_dict(torch.load(state_path))
 
 	print("Model training...")
@@ -282,7 +282,7 @@ if __name__ == "__main__":
 			print(f"step {i} | train loss: {train_loss} | test loss: {test_loss}")
 			# save the model to disk if it has improved
 			if best_loss is None or test_loss < best_loss:
-				out_path = os.path.join(work_dir, "model.pt")
+				out_path = os.path.join(work_dir, "model", "model.pt")
 				print(f"test loss {test_loss} is the best so far, saving model to {out_path}")
 				torch.save(model.state_dict(), out_path)
 				best_loss = test_loss
