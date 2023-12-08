@@ -597,7 +597,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Make More")
     # system/input/output
     parser.add_argument('--input-file', '-i', type=str, default='names.txt', help="input file with things one per line")
-    parser.add_argument('--work-dir', '-o', type=str, default='out', help="output working directory")
+    parser.add_argument('--work-dir', '-o', type=str, default='assets', help="output working directory")
     parser.add_argument('--resume', action='store_true', help="when this flag is used, we will resume optimization from existing model in the workdir")
     parser.add_argument('--sample-only', action='store_true', help="just sample from the model and quit, don't train")
     parser.add_argument('--num-workers', '-n', type=int, default=4, help="number of data workers for both train/test")
@@ -653,7 +653,7 @@ if __name__ == '__main__':
     print(f"model #params: {sum(p.numel() for p in model.parameters())}")
     if args.resume or args.sample_only: # note: if we sample-only then we also assume we are resuming
         print("resuming from existing model in the workdir")
-        model.load_state_dict(torch.load(os.path.join(args.work_dir, 'model.pt')))
+        model.load_state_dict(torch.load(os.path.join(args.work_dir, "model", 'model.pt')))
     if args.sample_only:
         print_samples(num=50)
         sys.exit()
@@ -703,7 +703,7 @@ if __name__ == '__main__':
             print(f"step {step} train loss: {train_loss} test loss: {test_loss}")
             # save the model to disk if it has improved
             if best_loss is None or test_loss < best_loss:
-                out_path = os.path.join(args.work_dir, "model.pt")
+                out_path = os.path.join(args.work_dir,"model", "model.pt")
                 print(f"test loss {test_loss} is the best so far, saving model to {out_path}")
                 torch.save(model.state_dict(), out_path)
                 best_loss = test_loss

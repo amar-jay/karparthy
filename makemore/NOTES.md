@@ -4,15 +4,13 @@ The bigram language model, as implemented in the provided notebook, employs a st
 
 #### **Basic Implementation** 
 Initially, the model involves creating a tensor that records the likelihood of pairs of characters occurring. This probability tensor is utilized to determine a sequence of characters, and the overall probability of the entire sequence occurring. The widely adopted metric for evaluating the performance of a bigram model is the Negative Mean Log Likelihood ($NMLL$). A lower $NMLL$ corresponds to lower loss, signifying a higher likelihood of the sequence occurring. However, a limitation arises as the model becomes less manageable with an increasing range of possibilities (pairs of characters), resulting in a frame that grows exponentially, making it challenging to monitor. \
-$$ Model\ size = v^c - 1$$ \
+$$Model\ size = v^c - 1$$ \
 $v$ = vocabulary size \
 c = context length 
 
 #### **Efficient Enhancement: Tensors and Gradient Descent** | [Paper](./assets/rumelhart86.pdf) 
 To address the scalability issues, a more efficient system was devised. This involves expressing the model in the form of an equation: $y=x \times M + c$, where $M$ represents the weights, and $c$ denotes the bias. The process begins with the multiplication of random weights $(M)$ by a one-hot encoding of all characters in the training set $(x)$. Each character is represented by a vector where only its corresponding index is set to 1, and the rest are 0. Subsequently, an activation function $(softmax)$ is applied to the results. The $softmax$ function normalizes the output, converting it into a probability distribution. \
-$$
-\text{softmax}(x)_i = \frac{e^{x_i}}{\sum_{j=1}^{n} e^{x_j}}
-$$
+$$softmax(x)_i = \frac{e^{x_i}}{\sum _{{i=1}} e^{x_i}}$$
 #### **Gradient Descent**
 Following the multiplication and activation, gradient descent is employed with a reasonable learning rate to iteratively adjust the weights. This iterative optimization process minimizes the loss, enhancing the model's ability to predict sequences accurately. Gradient descent computes the gradients of the loss with respect to the weights, indicating the direction in which the weights should be adjusted to reduce the loss.
 
