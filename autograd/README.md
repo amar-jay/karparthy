@@ -6,3 +6,6 @@ Autograd is a efficient and accurately method of deriving the derivatives of num
 and _algorithmic differentiation_. Every operation performed on tensors can be shown as a DAG (directed acylic graph).
 Thinking in terms of the DAG, using the chain rule the derivative can only be calculated only if the parent node is found.
 We can create a toplogical order similar to that [micrograd](https://github.com/karpathy/micrograd) but taking broadcasting and otehr tensor operations into account.
+
+
+- [Tensor product](https://www.youtube.com/watch?v=qp_zg_TD0qE)
