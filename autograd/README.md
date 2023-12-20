@@ -8,4 +8,6 @@ Thinking in terms of the DAG, using the chain rule the derivative can only be ca
 We can create a toplogical order similar to that [micrograd](https://github.com/karpathy/micrograd) but taking broadcasting and otehr tensor operations into account.
 
 
+### References 
 - [Tensor product](https://www.youtube.com/watch?v=qp_zg_TD0qE)
+- [micrograd](https://github.com/karpathy/micrograd) 
