@@ -1,4 +1,3 @@
-import torch
 from typing import Union
 import sys
 import numpy as np
@@ -111,7 +110,7 @@ def tanh(x: Tensor):
     y = Tensor(y, {x})
 
     def _backward():
-        x.grad += (1-y.grad**2) * y.grad
+        x.grad += (1-y.data**2) * y.grad
 
     y._backward = _backward
 
@@ -189,5 +188,3 @@ if __name__ == "__main__":
     print(f"e=c+d {c=}\t{d=}")
     print(f"c=a+b {b=}\t{a=}")
 
-    test_more_ops()
-    
