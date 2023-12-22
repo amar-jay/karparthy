@@ -17,35 +17,37 @@ class Tensor:
         self.grad = np.zeros_like(self.data, dtype=np.float64)  # is this really the best way to implement this?
 
     def zero_grad(self):
-        self.grad = np.ones_like(self.data, dtype=np.float64)
+        self.grad = np.zeros_like(self.data, dtype=np.float64)
+
 
     def __add__(self, other:'Tensor'):
-        out = Tensor(self.data + other.data, (self, other))
+        y = Tensor(self.data + other.data, (self, other))
 
         def _backward():
-            if self.data.size == other.data.size:
-                self.grad += out.grad
-                other.grad += out.grad
+            if self.data.shape == other.data.shape:
+                self.grad += y.grad
+                other.grad += y.grad
             else:
-                for i, j in zip(self.data.shape, out.data.shape):
+                print("broadcasting of sizes", self.data.shape, other.data.shape)
+                for i, j in zip(self.data.shape, y.data.shape):
                     if i != j:
-                        raise ValueError(f"Shapes are different self:{self.data.shape} other:{self.data.shape}")
+                        raise ValueError(f"Shapes are different self:{self.data.shape} other:{other.data.shape}")
 
-                if len(self.data.shape) < len(out.data.shape):
-                    self.grad += np.sum(out.data, axis=0)
-                    other.grad += out.data
+                if len(self.data.shape) < len(y.data.shape):
+                    self.grad += np.sum(y.data, axis=0)
+                    other.grad += y.data
 
-        out._backward = _backward
+        y._backward = _backward
 
-        return out
+        return y
 
     def __mul__(self, other:Union['Tensor', int, float]) -> 'Tensor':
         """
             dot and scalar product
         """
         if isinstance(other, (int, float)):
-            y = Tensor(other*self.data, (self,other))
-            print("from here")
+            other = Tensor([other])
+            y = Tensor(other.data*self.data, (self,other))
         else:
             if self.data.shape != other.data.shape:
                 raise ValueError(f"Shapes are different self:{self.data.shape} other:{other.data.shape}")
@@ -55,9 +57,12 @@ class Tensor:
             if isinstance(other, (int, float)):
                 self.grad += other * y.grad
                 return
+            if self.data.shape == (1,):
+                self.grad += other.data * y.grad
+                return
 
             if self.data.shape == other.data.shape:
-                self.grad += other.data * y.grad # works for two dimensional but fails for the rest 
+                self.grad += other.data * y.grad # works for two dimensional but fails for the rest
                 other.grad += self.data * y.grad
             else:
                 raise NotImplementedError # understanding how matrix multiplcation works
@@ -72,7 +77,7 @@ class Tensor:
         if self.data.shape != other.data.shape:
             raise ValueError(f"Shapes are different self:{self.data.shape} other:{other.data.shape}")
         y = Tensor(self.data @ other.data, (self, ))
-        
+
         def _backward():
             self.grad += np.dot(y.grad, other.grad.T)
             other.grad += np.dot(self.grad.T, y.grad)
@@ -80,13 +85,13 @@ class Tensor:
         return y
 
     def __pow__(self, n):
-        if n < 0: # numpy does not support negative exponents 
+        if n < 0: # numpy does not support negative exponents
             y = Tensor(1/(self.data ** -n), (self,))
         else:
             y = Tensor(self.data ** n, (self,))
 
         def _backward():
-            if n-1 < 0: # numpy does not support negative exponents 
+            if n-1 < 0: # numpy does not support negative exponents
                 self.grad += ((n / self.data ** -(n-1))) * y.grad
             else:
                 self.grad += (n * self.data ** (n-1)) * y.grad
@@ -118,12 +123,11 @@ class Tensor:
                         build_topo(child)
                 children.append(node)
         build_topo(self)
-        print(children)
+
+        children.reverse()
 
         for child in children:
-            if child is None:
-                print("null child ", child.data)
-                continue
+
             child._backward()
         return
 
@@ -132,7 +136,7 @@ class Tensor:
 
     def __sub__(self, other:'Tensor'):
         return self + (-other)
-    
+
     def __radd__(self, other): # other + self
         return self + other
 
@@ -154,11 +158,10 @@ class Tensor:
     def __repr__(self) -> str:
         data = self.data
         grad = self.grad
-        
-        return f"Tensor<{data.tolist()}, {grad=}>" if self.grad>0 else f"Tensor<{data.tolist()}>" 
+
+        return f"Tensor<{data.tolist()}, {grad=}>" if self.grad>0 else f"Tensor<{data.tolist()}>"
 
 
-# ---------------------------------- Activation functions --------------------------------
 def exp(x:Tensor):
     y = np.exp(x.data)
     y = Tensor(y, (x,))
@@ -182,6 +185,8 @@ def log(x:Tensor):
     y._backward = _backward
     return y
 
+# ---------------------------------- Activation functions --------------------------------
+
 def relu(x:Tensor):
     y = np.maximum(x.data, 0)
     y = Tensor(y, (x,))
@@ -194,26 +199,26 @@ def relu(x:Tensor):
     return y
 
 
-# check if both implementation are equal
-def sigmoid(x:Tensor):
+# checking if both implementation are equal
+def sigmoid_2(x:Tensor):
     return (Tensor([1])+exp(-x)) ** -1
 
-def sigmoid_2(x:Tensor):
+def sigmoid(x:Tensor):
     y = 1/(1+np.exp(-x.data))
     y = Tensor(y, (x,))
 
     def _backward():
         dy = x.data*(1-x.data)
         x.grad += dy * y.grad
-        return 
+        return
 
     y._backward = _backward
     return y
 
-def tanh(x:Tensor):
+def tanh_2(x:Tensor): # this implementation through seems attractive leads to overflow error
     return (exp(x) - exp(-x))/(exp(x) + exp(-x))
 
-def tanh_2(x:Tensor):
+def tanh(x:Tensor):
     y = np.tanh(x.data)
     y = Tensor(y, (x,))
 
@@ -224,4 +229,3 @@ def tanh_2(x:Tensor):
 
     y._backward = _backward
     return y
-
