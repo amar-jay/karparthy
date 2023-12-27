@@ -11,3 +11,4 @@ I will go into a deep dive into learning everything and to understand the field 
  Understanding Large Language Models from scratch 
 
 [never open this](https://drive.google.com/drive/u/0/folders/1iM8wkx5s7-vujfU07K9nR2U0RFfLldiM?q=sharedwith:public%20parent:1iM8wkx5s7-vujfU07K9nR2U0RFfLldiM)
+[this too](https://www.dropbox.com/scl/fo/ilxjlbe2cp0tkavo1sdg5/h?rlkey=1tna9mg0kyqtiqzxtn6d45nzx&dl=0)
