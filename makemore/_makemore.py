@@ -205,7 +205,7 @@ def evaluate(model, dataset, batch_size=None, max_batches=None):
 
 if __name__ == "__main__":
 	top_k = None
-	input_file = "./names.txt"
+	input_file = "./assets/names.txt"
 	work_dir = "./assets"
 	batch_size = 32
 	num_workers = 2
