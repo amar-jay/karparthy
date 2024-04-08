@@ -9,4 +9,3 @@ I will go into a deep dive into learning everything and to understand the field 
 -->
 
  Understanding Large Language Models from scratch 
-
